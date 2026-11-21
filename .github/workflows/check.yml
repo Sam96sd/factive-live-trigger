@@ -1,0 +1,39 @@
+name: Instant waitlist check
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'          # every 5 minutes (GitHub may start it a few minutes late)
+  workflow_dispatch:
+
+permissions:
+  contents: write                  # only for the monthly keep-alive commit below
+
+concurrency:
+  group: live-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for new registrants and start the private send
+        env:
+          GATEWAY_URL: ${{ secrets.GATEWAY_URL }}
+          GATEWAY_KEY: ${{ secrets.GATEWAY_KEY }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: python3 check.py
+
+      # GitHub switches off scheduled workflows in public repos after 60 days without a commit:
+      # the first run of each month commits the month into .keepalive.
+      - name: Monthly keep-alive commit
+        if: always() && github.event_name == 'schedule'
+        run: |
+          M=$(date -u +%Y-%m)
+          if [ "$(cat .keepalive 2>/dev/null)" != "$M" ]; then
+            echo "$M" > .keepalive
+            git config user.name "factive-bot"; git config user.email "factive-bot@users.noreply.github.com"
+            git add .keepalive && git commit -qm "keep-alive $M" && git push -q || true
+          fi
