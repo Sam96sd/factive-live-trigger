@@ -11,7 +11,7 @@ Data comes from the private sheet gateway; the URL, key and GitHub token are rep
 Secrets: GATEWAY_URL, GATEWAY_KEY, GH_TOKEN (fine-grained, Actions read+write on the private repo only).
 Standard library only (no pip step → shorter run).
 """
-import os, sys, json, re, datetime, urllib.request, urllib.parse
+import os, sys, json, re, time, datetime, urllib.request, urllib.parse
 
 PRIVATE_REPO = 'Sam96sd/factive-daily-cloud'
 WORKFLOW = 'daily.yml'
@@ -94,9 +94,25 @@ def main():
     print(f'new registrants: {len(ready)} · already messaged us: {len(ready) - fresh} · to message: {fresh}')
     if not fresh:
         return 0
-    st, _ = gh(f'/actions/workflows/{WORKFLOW}/dispatches', {'ref': 'main', 'inputs': {'slot': 'live'}})
-    print(f'private run started (HTTP {st})')
+    print(f'private run started (HTTP {dispatch_once()})')
     return 0
+
+
+def dispatch_once():
+    """Start the private live run. A temporary GitHub error gets ONE retry, but only after checking that the
+    first request did not start a run anyway (GitHub sometimes errors after accepting) — never two runs."""
+    asked = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=30)
+    body = {'ref': 'main', 'inputs': {'slot': 'live'}}
+    try:
+        return gh(f'/actions/workflows/{WORKFLOW}/dispatches', body)[0]
+    except Exception as e:
+        print(f'dispatch error ({type(e).__name__}) — checking before one retry')
+    time.sleep(20)
+    _, runs = gh(f'/actions/workflows/{WORKFLOW}/runs?per_page=5')
+    if any(iso(r['created_at']) >= asked for r in runs.get('workflow_runs', [])):
+        print('the first request did start the run — no retry needed')
+        return 'already started'
+    return gh(f'/actions/workflows/{WORKFLOW}/dispatches', body)[0]
 
 
 if __name__ == '__main__':
