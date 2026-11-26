@@ -4,7 +4,7 @@
 
 Every 2 hours (cron-job.org → workflow_dispatch; GitHub cron as backup) this rebuilds ONE fixed Google Sheet
 (PAYLIST_ID in the gateway's Code.gs) through the private sheet gateway (mode=upload, target=paylist):
-  • who: dashboard accounts created in the last KEEP_DAYS (3) days, at least WAIT_MIN (30) minutes ago,
+  • who: dashboard accounts created in the last KEEP_DAYS (3) days, at least WAIT_MIN (45) minutes ago (after the dashboard's own reminder, sent 31–40 min after a payment attempt),
          with NO Paid subscription. Deleted and test accounts are skipped. Whoever pays drops out at the next run.
   • columns (مِرسال فاكتيف format): name, wa.me, phone, email, country, signed up, status, ready message, notes.
   • message: asks what problem they hit, so they reply (text approved by Samer 26/11/2026).
@@ -16,7 +16,7 @@ import os, sys, json, re, datetime, urllib.request, urllib.parse, urllib.error, 
 
 API = 'https://api.factive.app/api'
 KEEP_DAYS = int(os.environ.get('PAYLIST_DAYS', '3'))
-WAIT_MIN = int(os.environ.get('PAYLIST_WAIT_MIN', '30'))
+WAIT_MIN = int(os.environ.get('PAYLIST_WAIT_MIN', '45'))
 KW = datetime.timezone(datetime.timedelta(hours=3))
 TAB = 'لم يكمل الدفع'          # fixed: مِرسال keeps the «أرسلت» marks per file + tab + phone
 DRY = '--dry-run' in sys.argv
