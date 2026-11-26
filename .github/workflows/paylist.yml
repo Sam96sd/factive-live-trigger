@@ -1,0 +1,36 @@
+name: Paylist (accounts that did not pay)
+
+# «💳 لم يكمل الدفع»: rebuilds the customer-service sheet every 2 hours (Samer 26/11/2026).
+# Main trigger: cron-job.org → workflow_dispatch every 2 hours. The GitHub cron below is only a backup
+# (GitHub often starts public-repo crons late). The run is idempotent: it rebuilds the whole sheet.
+on:
+  schedule:
+    - cron: '41 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Count only, upload nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paylist
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the list and upload it (prints counts only — this log is public)
+        env:
+          GATEWAY_URL: ${{ secrets.GATEWAY_URL }}
+          GATEWAY_KEY: ${{ secrets.GATEWAY_KEY }}
+          DASH_EMAIL: ${{ secrets.DASH_EMAIL }}
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then python3 paylist.py --dry-run; else python3 paylist.py; fi
