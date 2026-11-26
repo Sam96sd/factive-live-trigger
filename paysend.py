@@ -116,12 +116,22 @@ def gb_send(tpl, name, phone, fn):
     try:
         with urllib.request.urlopen(req, timeout=45) as r:
             return r.status in (200, 201, 202)
-    except urllib.error.HTTPError:
+    except urllib.error.HTTPError as e:
+        print('gallabox http', e.code)            # status code only
         return False
 
 
 # ----------------------------------------------------------------------------- main
+def self_test():
+    """--test-self: send the «account only» men's template once to Samer's own number (secret PAYSEND_TEST_PHONE)."""
+    ok = gb_send(TPL[('acct', 'M')], 'SAMER SAAD', P.digits(os.environ['PAYSEND_TEST_PHONE']), 'سامر')
+    print('test send:', 'accepted' if ok else 'FAILED')
+    return 0 if ok else 1
+
+
 def main():
+    if '--test-self' in sys.argv:
+        return self_test()
     now = datetime.datetime.now(datetime.timezone.utc)
     st = load_state(now)
     tok = P.login()

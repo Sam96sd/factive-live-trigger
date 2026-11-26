@@ -12,6 +12,10 @@ on:
         description: 'Count only, send nothing'
         type: boolean
         default: false
+      test_self:
+        description: 'Send one test message to Samer only (secret PAYSEND_TEST_PHONE)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,10 +46,12 @@ jobs:
           GB_CHANNEL_ID: ${{ vars.GB_CHANNEL_ID }}
           PAYSEND_TRIED: ${{ vars.PAYSEND_TRIED }}
           PAYSEND_ACCT: ${{ vars.PAYSEND_ACCT }}
+          PAYSEND_TEST_PHONE: ${{ secrets.PAYSEND_TEST_PHONE }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then python3 paysend.py --dry-run; else python3 paysend.py; fi
+          if [ "${{ github.event.inputs.test_self }}" = "true" ]; then python3 paysend.py --test-self
+          elif [ "${{ github.event.inputs.dry_run }}" = "true" ]; then python3 paysend.py --dry-run; else python3 paysend.py; fi
       - name: Save the sent-state (also after a partial failure)
-        if: always() && github.event.inputs.dry_run != 'true' && hashFiles('.paysend-state.json') != ''
+        if: always() && github.event.inputs.dry_run != 'true' && github.event.inputs.test_self != 'true' && hashFiles('.paysend-state.json') != ''
         uses: actions/cache/save@v4
         with:
           path: .paysend-state.json
