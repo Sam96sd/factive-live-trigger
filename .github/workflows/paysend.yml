@@ -1,0 +1,52 @@
+name: Paysend (automatic WhatsApp to accounts that did not pay)
+
+# Samer 26/11/2026: «حاول يدفع» ~35 min after an unpaid payment attempt, «سوّى حساب فقط» 60 min after the account.
+# Main trigger: cron-job.org → workflow_dispatch every 10 minutes. The GitHub cron is only a backup.
+# Repeats are impossible: every send is recorded (as an HMAC) in .paysend-state.json, kept in the Actions cache.
+on:
+  schedule:
+    - cron: '23,53 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Count only, send nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paysend
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the sent-state
+        uses: actions/cache/restore@v4
+        with:
+          path: .paysend-state.json
+          key: paysend-state-${{ github.run_id }}
+          restore-keys: paysend-state-
+      - name: Send (prints counts only — this log is public)
+        env:
+          DASH_EMAIL: ${{ secrets.DASH_EMAIL }}
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
+          GATEWAY_KEY: ${{ secrets.GATEWAY_KEY }}
+          GB_API_KEY: ${{ secrets.GB_API_KEY }}
+          GB_API_SECRET: ${{ secrets.GB_API_SECRET }}
+          GB_CHANNEL_ID: ${{ vars.GB_CHANNEL_ID }}
+          PAYSEND_TRIED: ${{ vars.PAYSEND_TRIED }}
+          PAYSEND_ACCT: ${{ vars.PAYSEND_ACCT }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then python3 paysend.py --dry-run; else python3 paysend.py; fi
+      - name: Save the sent-state (also after a partial failure)
+        if: always() && github.event.inputs.dry_run != 'true' && hashFiles('.paysend-state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .paysend-state.json
+          key: paysend-state-${{ github.run_id }}-${{ github.run_attempt }}
