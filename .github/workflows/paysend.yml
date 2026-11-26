@@ -46,6 +46,7 @@ jobs:
           GB_CHANNEL_ID: ${{ vars.GB_CHANNEL_ID }}
           PAYSEND_TRIED: ${{ vars.PAYSEND_TRIED }}
           PAYSEND_ACCT: ${{ vars.PAYSEND_ACCT }}
+          PAYSEND_OLD_OFF: ${{ vars.PAYSEND_OLD_OFF }}
           PAYSEND_TEST_PHONE: ${{ secrets.PAYSEND_TEST_PHONE }}
         run: |
           if [ "${{ github.event.inputs.test_self }}" = "true" ]; then python3 paysend.py --test-self

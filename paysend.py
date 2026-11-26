@@ -29,6 +29,9 @@ TRIED_MIN = int(os.environ.get('PAYSEND_TRIED_MIN', '35'))
 ACCT_MIN = int(os.environ.get('PAYSEND_ACCT_MIN', '60'))
 WINDOW_MIN = int(os.environ.get('PAYSEND_WINDOW_MIN', '120'))
 KEEP_DAYS = 7
+# When the dashboard's old reminder templates were deleted (repo variable PAYSEND_OLD_OFF, ISO time). A dashboard
+# reminder recorded before this moment really went out, so that attempt gets no second message from us.
+OLD_OFF = datetime.datetime.fromisoformat(os.environ.get('PAYSEND_OLD_OFF') or '2100-01-01T00:00:00+00:00')
 DRY = '--dry-run' in sys.argv
 STATE = Path(os.environ.get('PAYSEND_STATE', '.paysend-state.json'))
 GB_API = 'https://server.gallabox.com/devapi'
@@ -145,7 +148,7 @@ def main():
     todo = []                                    # (kind, client_id, client dict)
     # TRIED: newest unpaid subscription per client, created TRIED_MIN..TRIED_MIN+WINDOW_MIN ago, nothing paid since
     lo, hi = now - datetime.timedelta(minutes=TRIED_MIN + WINDOW_MIN), now - datetime.timedelta(minutes=TRIED_MIN)
-    seen = set()
+    seen, n_old = set(), 0
     for s in sorted(subs, key=lambda s: P.when(s.get('created_at')), reverse=True):
         cid = str(s.get('client_id'))
         if s.get('payment_status') == 'Paid' or cid in seen or not (lo <= P.when(s.get('created_at')) <= hi):
@@ -154,6 +157,9 @@ def main():
         t0 = P.when(s.get('created_at')) - datetime.timedelta(minutes=1)
         if any(x.get('payment_status') == 'Paid' and P.when(x.get('created_at')) >= t0 for x in by.get(cid, [])):
             continue
+        # the dashboard's own reminder (old templates pending_payment_*) went out before they were deleted → not again
+        if s.get('whatsapp_payment_reminder_sent_at') and P.when(s.get('whatsapp_payment_reminder_sent_at')) < OLD_OFF:
+            n_old += 1; continue
         todo.append(('tried', cid, s.get('client_info') or {}))
     # ACCT: account created ACCT_MIN..ACCT_MIN+WINDOW_MIN ago with no subscription at all
     lo, hi = now - datetime.timedelta(minutes=ACCT_MIN + WINDOW_MIN), now - datetime.timedelta(minutes=ACCT_MIN)
@@ -191,6 +197,7 @@ def main():
             n['failed'] += 1
     save_state(st)
     print('switches: tried=%s acct=%s' % (on('tried'), on('acct')))
+    print('tried already reminded by the dashboard:', n_old)
     print(' · '.join(f'{k}: {v}' for k, v in n.items()) + f' · tried: {per["tried"]} · acct: {per["acct"]}'
           + (' (dry run: would send)' if DRY else ''))
     return 1 if n['failed'] else 0
