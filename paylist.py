@@ -28,7 +28,9 @@ MSG_F = ('السلام عليكم أخت {fn} 🌹\nمعاج فاطمة من ف�
          'شفت إنج سويتي حساب بموقعنا وما اكتمل اشتراكج\n'
          'بلغيني شنو المشكلة اللي واجهتج حتى أساعدج ونكمل اشتراكج على طول 💐')
 COUNTRY = {'KW': 'الكويت', 'SA': 'السعودية', 'AE': 'الإمارات', 'QA': 'قطر', 'BH': 'البحرين', 'OM': 'عُمان',
-           'US': 'أمريكا', 'GB': 'بريطانيا', 'UK': 'بريطانيا'}
+           'US': 'أمريكا', 'GB': 'بريطانيا', 'UK': 'بريطانيا',
+           'KUWAIT': 'الكويت', 'SAUDI ARABIA': 'السعودية', 'UNITED ARAB EMIRATES': 'الإمارات', 'UAE': 'الإمارات',
+           'QATAR': 'قطر', 'BAHRAIN': 'البحرين', 'OMAN': 'عُمان', 'UNITED STATES': 'أمريكا', 'UNITED KINGDOM': 'بريطانيا'}
 
 
 def http(url, data=None, headers=None, timeout=90):
@@ -119,7 +121,7 @@ def main():
         if len(ph) < 8:
             n_nophone += 1; continue
         pi = c.get('personal_info') or {}
-        female = str(pi.get('gender') or '').lower() == 'female'
+        female = str(pi.get('gender') or '').lower() == 'female'      # gender missing on most new accounts → masculine text
         fn = first_name(c)
         unpaid = [s for s in mine if s.get('payment_status') != 'Paid']
         if unpaid:
@@ -131,12 +133,10 @@ def main():
         notes = []
         if any(s.get('whatsapp_payment_reminder_sent_at') for s in unpaid):
             notes.append('وصله تذكير دفع تلقائي من النظام')
-        if not pi.get('gender'):
-            notes.append('الجنس غير محدد في الحساب — الرسالة بصيغة المذكر')
         signed = when(c.get('created_at')).astimezone(KW).strftime('%d/%m %H:%M')
         country = pi.get('country_of_residence') or ''
         rows.append([c.get('full_name') or fn, 'https://wa.me/' + ph, ph, c.get('email') or '',
-                     COUNTRY.get(str(country).upper(), country), signed, status,
+                     COUNTRY.get(str(country).strip().upper(), country), signed, status,
                      (MSG_F if female else MSG_M).format(fn=fn), ' · '.join(notes)])
     stamp = now.astimezone(KW).strftime('%d/%m %H:%M')
     head = ['الاسم', 'رابط واتساب', 'الرقم', 'الإيميل', 'الدولة', 'وقت التسجيل', 'الحالة', 'الرسالة الجاهزة',
